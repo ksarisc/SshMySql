@@ -38,6 +38,11 @@ namespace SshMySql
             get { return connection.ServerVersion; }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="dbConf"></param>
+        /// <param name="sshConf"></param>
         public SshMySqlConnection(string dbConf, SshClientConfig sshConf)
             : this(new DatabaseConfig(dbConf), sshConf)
         {
@@ -52,7 +57,7 @@ namespace SshMySql
         {
             if (dbConf == null)
                 throw new ArgumentNullException($"{nameof(dbConf)} must be specified.", nameof(dbConf));
-            uint boundPort = (uint)dbConf.Port;
+            uint boundPort = dbConf.Port;
             if (sshConf != null)
             {
                 if (String.IsNullOrEmpty(sshConf.HostName))
@@ -64,25 +69,11 @@ namespace SshMySql
                 if (String.IsNullOrEmpty(dbConf.Server))
                     throw new ArgumentException($"{nameof(dbConf.Server)} must be specified.", nameof(dbConf.Server));
 
-                var authenticationMethods = new List<AuthenticationMethod>();
-                if (!String.IsNullOrEmpty(sshConf.KeyFile))
-                {
-#if DEBUG
-                    System.Diagnostics.Debug.WriteLine($"KeyFile: {sshConf.KeyFile}");
-#endif
-                    authenticationMethods.Add(new PrivateKeyAuthenticationMethod(sshConf.UserName,
-                        new PrivateKeyFile(sshConf.KeyFile, String.IsNullOrEmpty(sshConf.KeyPassPhrase) ? null : sshConf.KeyPassPhrase)));
-                }
-                if (!String.IsNullOrEmpty(sshConf.Password))
-                {
-                    authenticationMethods.Add(new PasswordAuthenticationMethod(sshConf.UserName, sshConf.Password));
-                }
-
-                sshClient = new SshClient(new ConnectionInfo(sshConf.HostName, sshConf.Port, sshConf.UserName, authenticationMethods.ToArray()));
+                sshClient = new SshClient(sshConf.GetConnectionInfo());
                 sshClient.Connect();
 
                 // forward a local port to the database server and port, using the SSH server
-                forward = new ForwardedPortLocal(Extensions.Localhost, dbConf.Server, (uint)dbConf.Port);
+                forward = new ForwardedPortLocal(Extensions.Localhost, dbConf.Server, dbConf.Port);
                 sshClient.AddForwardedPort(forward);
                 forward.Start();
                 boundPort = forward.BoundPort;
